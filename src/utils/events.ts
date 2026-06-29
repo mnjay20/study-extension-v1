@@ -4,6 +4,8 @@ export const Events = {
   SESSION: {
     JOIN: "session:join",
     LEAVE: "session:leave",
+    CREATE: "session:create",
+    UPDATE: "session:update",
   },
 
   VIDEO: {
@@ -84,9 +86,6 @@ export const Events = {
     FAILED: "job:failed",
   },
 
-  PROGRESS: {
-    UPDATE: "progress:update",
-  },
 
   USER: {
     ONLINE: "user:online",

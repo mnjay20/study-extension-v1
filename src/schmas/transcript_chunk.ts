@@ -1,13 +1,21 @@
-export type TranscriptChunk = {
-  sessionId: string;
+import { z } from "zod";
 
-  chunkIndex: number;
+export const TranscriptChunkSchema = z.object({
+  sessionId: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
+  startAt: z.number().nonnegative(),
+  endAt: z.number().nonnegative(),
+  text: z.string(),
+  createdAt : z.coerce.date()
+});
 
-  startAt: number;
+export type TranscriptChunk = z.infer<typeof TranscriptChunkSchema>;
 
-  endAt: number;
+export const TranscriptChunkWithImageSchema =
+  TranscriptChunkSchema.extend({
+    image: z.string().optional(),
+  });
 
-  text: string;
-}
-
-export type TranscriptChunkWithImage = TranscriptChunk & {image? : string}
+export type TranscriptChunkWithImage = z.infer<
+  typeof TranscriptChunkWithImageSchema
+>;
