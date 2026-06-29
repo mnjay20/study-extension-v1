@@ -1,0 +1,447 @@
+1. pop up component in which there is a field in which the api key must be givev
+
+2. main hero componenet on the right side of the video which there are some options 
+
+3. there will be a option of starting the video with or without  transcript
+
+4  there is component which the real time transcription generation by chunk is displayed 
+
+5. there will be an option enable voice control when enabled there will be a guide first which u have to go through to use the feature
+
+6. make a zip of the files(including the screenshots and the notes file) and add and option to download the zip
+
+7. i can just retrive the specific frame of the video instead of a screenshot.
+
+8. for the bundler i will crxjs and store the api key and encode it and then store it in the chrome storage api
+
+9. (Split: Remove the header (data:image/png;base64,).
+
+Decode: Use atob() (ASCII to Binary) to turn the Base64 string into a raw string of characters where each character represents a byte.
+
+Buffer: Create a Uint8Array (a typed array) of the same length as the string.
+
+Fill: Loop through the string and put each character's "Char Code" into the array.
+
+Wrap: Pass that array into the new Blob() constructor.) or just use the fetch 
+
+
+for audio fetching : yt-dlp --no-playlist -f ba -o - URL
+
+
+Frontend
+   ↓ (start job)
+Backend (Node)
+   ↓
+yt-dlp (single stream)
+   ↓
+FFmpeg (PCM)
+   ↓
+Chunker (30s)
+   ↓
+Whisper API / model
+   ↓
+WebSocket updates
+   ↓
+Frontend UI (live notes)
+
+
+
+PCM stream
+   ↓
+Node buffer accumulates bytes
+   ↓
+Every 30 seconds → create chunk
+   ↓
+Send chunk to Whisper
+
+
+
+1. Chunk transcript
+2. Running summary (compressed context)
+3. Final structured notes
+
+const prompt = `
+You are an AI note generator.
+
+Previous summary:
+${summary}
+
+New transcript chunk:
+${chunk}
+
+Task:
+- Update the notes
+- Keep it concise
+- Maintain structure
+`;
+
+
+chunk
+  ↓
+Chunk Agent (filter + tag)
+  ↓
+Topic Agent (structure decision)
+  ↓
+Note Agent (write/update notes)
+  ↓
+Memory Agent (update summary + key concepts)
+  ↓
+(optional) Critic Agent (validate)
+
+
+Minimum viable agent system
+1. Router Agent
+decides: ignore / process / new topic
+2. Note Agent
+writes structured notes
+3. Memory Agent
+updates summary + key concepts
+
+
+notes: {
+  summary: string;
+
+  chapters: Chapter[];
+}
+
+type Chapter = {
+  topic: string;
+
+  definitions: string[];
+
+  bullet_points: string[];
+
+  diagrams: string[]; // URLs / optional
+};	
+diagrams: {
+  type: "image" | "generated" | "external";
+  url: string;
+  caption?: string;
+}[];
+
+
+ffmpeg -ss t_start -i video.mp4 -frames:v 1 start.jpg
+ffmpeg -ss t_mid   -i video.mp4 -frames:v 1 mid.jpg
+ffmpeg -ss t_end   -i video.mp4 -frames:v 1 end.jpg
+
+
+YouTube Video
+↓
+yt-dlp
+↓
+video.mp4
+├── ffmpeg → audio.wav
+│        ↓
+│     Whisper
+│        ↓
+│     Transcript
+│
+└── ffmpeg → frame every 20 sec
+         ↓
+     Gemini Flash / GPT-4o-mini vision
+         ↓
+     OCR text + frame description
+         ↓
+Merge by timestamp
+↓
+Chunk
+↓
+LLM notes
+↓
+Embeddings
+↓
+MongoDB Vector Search
+
+
+  
+
+
+
+
+		  Session Start
+                       │
+                       ▼
+              Backend downloads audio
+                       │
+                       ▼
+             Split into 20-second chunks
+                       │
+                       ▼
+         Whisper transcribes all chunks
+                       │
+                       ▼
+             Temporary transcript cache
+                       │
+─────────────────────────────────────────────
+User watches video
+                       │
+Every 20 seconds
+                       ▼
+Frontend captures frame
+                       │
+                       ▼
+Send:
+{
+  timestamp: 120,
+  frame: <image>
+}
+                       │
+                       ▼
+Backend
+                       │
+                       ▼
+Vision Model
+                       │
+                       ▼
+Visual Description
+
+"Slide shows binary search tree insertion
+pseudocode and a tree diagram."
+                       │
+                       ▼
+Retrieve transcript chunk (120-140 sec)
+
+"Today we will discuss insertion
+operations in binary search trees."
+                       │
+                       ▼
+Combine them
+                       │
+                       ▼
+{
+    startTime: 120,
+    endTime: 140,
+
+    transcript:
+    "Today we will discuss insertion
+    operations in binary search trees.",
+
+    visualContext:
+    "Slide shows binary search tree
+    insertion pseudocode and a tree diagram."
+}
+                       │
+                       ▼
+LLM
+                       │
+                       ▼
+Generate:
+• Notes
+• Key points
+• Code blocks
+• Flashcards
+• Summary
+                       │
+                       ▼
+Store NoteChunk + Embeddings
+
+
+
+                User pastes YouTube URL
+                           │
+                           ▼
+                    Backend Worker
+                           │
+                           ▼
+                     yt-dlp download
+                           │
+                           ▼
+                        ffmpeg
+                           │
+                           ▼
+              Split audio into 20-second chunks
+                           │
+                           ▼
+                 Whisper transcription pool
+                           │
+                           ▼
+             Temporary transcript cache (Redis)
+────────────────────────────────────────────────────
+
+                  User watches video
+
+Every 20 seconds:
+
+Frontend
+    │
+    ├── Capture current frame
+    │
+    └── Send
+        {
+            sessionId,
+            timestamp,
+            frame
+        }
+
+────────────────────────────────────────────────────
+
+Backend
+
+1. Vision model
+       ↓
+   Visual Context
+
+2. Find transcript chunk
+       ↓
+   Transcript
+
+3. Build pre-LLM chunk
+
+{
+    startTime,
+    endTime,
+
+    transcript,
+
+    visualContext
+}
+
+4. Send to LLM
+       ↓
+
+Generate
+
+- Notes
+- Key points
+- Definitions
+- Code snippets
+- Examples
+
+5. Store NoteChunk
+       ↓
+
+6. Generate embeddings
+       ↓
+
+7. Store EmbeddingChunk
+
+────────────────────────────────────────────────────
+
+User can later
+
+- Search notes semantically
+- Ask questions
+- Generate summaries
+- Generate flashcards
+
+
+
+ai-study-extension/
+│
+├── extension/                     # Chrome extension
+│   ├── manifest.json
+│   │
+│   ├── background/
+│   │   ├── service-worker.ts
+│   │   ├── websocket.ts          # Connects to AI backend
+│   │   └── messageRouter.ts
+│   │
+│   ├── content/
+│   │   ├── youtube.ts
+│   │   ├── pageScanner.ts
+│   │   └── selection.ts
+│   │
+│   ├── popup/
+│   │   ├── Popup.tsx
+│   │   └── popup.css
+│   │
+│   ├── sidepanel/
+│   │   ├── SidePanel.tsx
+│   │   ├── Chat.tsx
+│   │   ├── Notes.tsx
+│   │   ├── Diagrams.tsx
+│   │   └── Voice.tsx
+│   │
+│   ├── lib/
+│   │   ├── websocketClient.ts
+│   │   ├── api.ts
+│   │   ├── storage.ts
+│   │   └── logger.ts
+│   │
+│   ├── hooks/
+│   │
+│   ├── utils/
+│   │
+│   └── types/
+│
+├── server/                        # Local AI server
+│   │
+│   ├── src/
+│   │
+│   ├── websocket/
+│   │   ├── server.ts
+│   │   ├── connection.ts
+│   │   ├── handlers/
+│   │   │   ├── chat.ts
+│   │   │   ├── notes.ts
+│   │   │   ├── summarize.ts
+│   │   │   ├── voice.ts
+│   │   │   └── diagram.ts
+│   │   └── events.ts
+│   │
+│   ├── agents/
+│   │   ├── planner.ts
+│   │   ├── noteAgent.ts
+│   │   ├── codingAgent.ts
+│   │   ├── diagramAgent.ts
+│   │   ├── quizAgent.ts
+│   │   └── memoryAgent.ts
+│   │
+│   ├── pipelines/
+│   │   ├── transcription.ts
+│   │   ├── ocr.ts
+│   │   ├── vision.ts
+│   │   ├── embedding.ts
+│   │   └── retrieval.ts
+│   │
+│   ├── llm/
+│   │   ├── gemini.ts
+│   │   ├── openai.ts
+│   │   ├── ollama.ts
+│   │   └── promptBuilder.ts
+│   │
+│   ├── database/
+│   │
+│   ├── cache/
+│   │
+│   ├── config/
+│   │
+│   └── index.ts
+│
+├── shared/
+│   ├── events.ts
+│   ├── messageTypes.ts
+│   ├── schemas.ts
+│   └── constants.ts
+│
+└── package.json
+
+
+
+Browser Extension
+       │
+       ▼
+Audio Chunk
+       │
+       ▼
+Redis Queue 1 (audio)
+       │
+       ▼
+Transcription Worker
+       │
+       ├── Transcribe
+       ├── Remove overlap duplicates
+       ├── Store transcript chunk
+       └── Create embedding (optional)
+       │
+       ▼
+Redis Queue 2 (llm)
+       │
+       ▼
+LLM Worker
+       │
+       ├── Fetch previous context
+       ├── Build sliding window
+       ├── Generate notes
+       ├── Update running summary
+       └── Save results
