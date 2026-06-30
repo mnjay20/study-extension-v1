@@ -30,13 +30,13 @@ export const Events = {
 
   AUDIO: {
     DOWNLOAD_STARTED: "audio:download_started",
-    DOWNLOAD_COMPLETED: "audio:download_completed",
+    
     CHUNKING_COMPLETED: "audio:chunking_completed",
   },
 
   TRANSCRIPT: {
     CHUNK_READY: "transcript:chunk_ready",
-    CORRECTED: "transcript:corrected",
+    NEXT_CHUNK: "transcript:next_chunk",
     COMPLETED: "transcript:completed",
 },
 

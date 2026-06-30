@@ -3,7 +3,10 @@
 
 import { spawn } from 'child_process';
 import { spawnYtdlp } from './load_audio.js';
-import { mkdir } from "fs/promises";
+import { mkdir, rm } from "fs/promises";
+import { getIO } from '../webSockets/server.js';
+import { Events } from './events.js';
+
 
 
 /*    
@@ -24,7 +27,8 @@ import { mkdir } from "fs/promises";
 
 
 function ffmpegSpawn(chunk_size: number, sessionId: string) {
-    const ffmpeg = spawn('ffmpeg', [
+  
+    return spawn('ffmpeg', [
         '-hide_banner',
         '-loglevel', 'error',
         '-i', 'pipe:0',
@@ -34,50 +38,88 @@ function ffmpegSpawn(chunk_size: number, sessionId: string) {
         '-ar', '16000',
         '-ac', '1',
         `./cache/${sessionId}/%04d.wav`
-    ])
-
-    ffmpeg.on('error', (err) => {
-        console.error("Failed to start ffmpeg:", err)
-    })
-    ffmpeg.on('close', (code) => {
-        if (code !== 0) {
-            console.error(`ffmpeg exited with code ${code}`);
-        }
-    })
-
-    return ffmpeg
+    ]);
 }
 
 
 export async function audioChunker(url: string, chunk_size: number, sessionId: string) {
+    await rm(`cache/${sessionId}`, { recursive: true, force: true });
     await mkdir(`cache/${sessionId}`, { recursive: true });
 
-    const ytdlp = spawnYtdlp(url)
-    const ffmpeg = ffmpegSpawn(chunk_size, sessionId)
+    const ytdlp = spawnYtdlp(url);
+    const ffmpeg = ffmpegSpawn(chunk_size, sessionId);
 
-    ytdlp.stdout.pipe(ffmpeg.stdin)
+    ytdlp.stdout.pipe(ffmpeg.stdin);
 
     ffmpeg.stderr.on("data", (data) => {
-        console.error(data.toString());
-    });
-
-    ytdlp.on("close", (code) => {
-        if (code !== 0) {
-            console.error(`yt-dlp exited with code ${code}`);
-        }
-
-        ffmpeg.stdin.end()
+        console.error("ffmpeg stderr:", data.toString());
     });
 
     ytdlp.stderr.on("data", (data) => {
-        console.error(data.toString());
+        console.error("yt-dlp stderr:", data.toString());
     });
+    const io = getIO();
+    const events = Events;
     return new Promise<{ ytdlp: typeof ytdlp, ffmpeg: typeof ffmpeg }>((resolve, reject) => {
-        ytdlp.on("close", (code) => {
-            if (code !== 0) console.error(`yt-dlp exited with code ${code}`);
-            ffmpeg.stdin.end();
+        let finished = false;
+
+        const handleError = (err: Error) => {
+            if (finished) return;
+            finished = true;
+
+            if (ytdlp.exitCode === null && !ytdlp.killed) {
+                ytdlp.kill();
+            }
+            if (ffmpeg.exitCode === null && !ffmpeg.killed) {
+                ffmpeg.kill();
+            }
+
+            if (io) {
+                io.to(sessionId).emit(events.ERROR.GENERAL, {
+                    sessionId,
+                    error: err.message,
+                });
+            }
+
+            reject(err);
+        };
+
+        ytdlp.on("error", (err) => {
+            handleError(new Error(`yt-dlp process error: ${err.message}`));
         });
+
+        ffmpeg.on("error", (err) => {
+            handleError(new Error(`ffmpeg process error: ${err.message}`));
+        });
+
+        ytdlp.stdout.on("error", (err) => {
+            handleError(new Error(`yt-dlp stdout stream error: ${err.message}`));
+        });
+
+        ffmpeg.stdin.on("error", (err) => {
+            handleError(new Error(`ffmpeg stdin stream error: ${err.message}`));
+        });
+
+        ffmpeg.stderr.on("error", (err) => {
+            handleError(new Error(`ffmpeg stderr stream error: ${err.message}`));
+        });
+
+        ytdlp.stderr.on("error", (err) => {
+            handleError(new Error(`yt-dlp stderr stream error: ${err.message}`));
+        });
+
+        ytdlp.on("close", (code) => {
+            if (finished) return;
+            if (code !== 0) {
+                handleError(new Error(`yt-dlp exited with code ${code}`));
+            } else {
+                ffmpeg.stdin.end();
+            }
+        });
+
         ffmpeg.on("close", (code) => {
+            if (finished) return;
+            finished = true;
             if (code !== 0) {
                 reject(new Error(`ffmpeg exited with code ${code}`));
             } else {

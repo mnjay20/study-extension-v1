@@ -7,7 +7,10 @@ let db : Db | null = null
 
 export async function getClient():Promise<MongoClient>{
     if(!client){
-        client = new MongoClient(env.MONGO_DB_URI)
+        client = new MongoClient(env.MONGO_DB_URI, {
+            serverSelectionTimeoutMS: 2000,
+            connectTimeoutMS: 2000,
+        })
         await client.connect()
         console.log("connected to db")
         return client
