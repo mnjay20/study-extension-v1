@@ -1,17 +1,21 @@
 import type { Socket } from "socket.io";
 import {
-    CreateSessionPayloadSchema,
+  CreateSessionPayloadSchema,
   JoinSessionPayloadSchema,
   SessionSchema,
+  UpdateProgressPayloadSchema,
+  UpdateStatusPayloadSchema,
   type CreateSessionPayload,
-  type CreateSessionResponse,
+  type SessionResponse,
   type JoinSessionPayload,
   type SessionType,
+  type SessionStatusType,
 } from "../../schmas/session_schema.js";
 import { Events } from "../../utils/events.js";
 import { getSessionCollection } from "../../database/collections.js";
 import { nanoid } from "nanoid";
-import { getIO } from "../server.js";
+import { redis } from "../../configs/redis.js";
+
 
 /*
 export const SessionSchema = z.object({
@@ -48,20 +52,23 @@ export function SessionCreateHandler(socket: Socket) {
   const events = Events;
   socket.on(
     events.SESSION.CREATE,
-    async (payload:CreateSessionPayload, callback : (response: CreateSessionResponse)=>void) => {
+    async (
+      payload: CreateSessionPayload,
+      callback: (response: SessionResponse) => void,
+    ) => {
       // creates a session
       try {
-         const parsedPayload = CreateSessionPayloadSchema.safeParse(payload);
+        const parsedPayload = CreateSessionPayloadSchema.safeParse(payload);
 
-    if (!parsedPayload.success) {
-      callback({
-        success: false,
-        message: "Invalid payload",
-      });
-      return;
-    }
+        if (!parsedPayload.success) {
+          callback({
+            success: false,
+            message: "Invalid payload",
+          });
+          return;
+        }
 
-    const { userId, videoTitle, videoUrl, duration } = parsedPayload.data;
+        const { userId, videoTitle, videoUrl, duration } = parsedPayload.data;
 
         const sessionId = nanoid(16);
         const col = await getSessionCollection();
@@ -92,7 +99,11 @@ export function SessionCreateHandler(socket: Socket) {
         }
 
         await col.insertOne(parsed.data); // creates the db object
-
+        await redis.hset(`session:${sessionId}`, {
+          status: "creating",
+          progress: 0,
+        } ); // creates the redis cache object
+        await redis.expire(`session:${sessionId}`, 86400);
         callback({
           success: true,
           sessionId,
@@ -108,31 +119,77 @@ export function SessionCreateHandler(socket: Socket) {
   );
 }
 
-
 export function SessionJoinHandler(socket: Socket) {
   const events = Events;
   socket.on(
     events.SESSION.JOIN,
-    async (sessionData: JoinSessionPayload, callback: (response: CreateSessionResponse) => void) => {
+    async (
+      sessionData: JoinSessionPayload,
+      callback: (response: SessionResponse) => void,
+    ) => {
       try {
-
         const parsedPayload = JoinSessionPayloadSchema.safeParse(sessionData);
-        if(!parsedPayload.success){
-            callback({
-                success: false,
-                message: "Invalid session data"
-            });
-            return;
+        if (!parsedPayload.success) {
+          callback({
+            success: false,
+            message: "Invalid session data",
+          });
+          return;
         }
         const { sessionId } = parsedPayload.data;
-        
+
+        // Verify if session exists in Redis
+        let currentStatus = await redis.hget(`session:${sessionId}`, "status");
+        const col = await getSessionCollection();
+
+        if (!currentStatus) {
+          // If not in Redis, check MongoDB
+          if (!col) {
+            callback({
+              success: false,
+              message: "Database connection failed",
+            });
+            return;
+          }
+          const sessionDb = await col.findOne({ sessionId });
+          if (!sessionDb) {
+            callback({
+              success: false,
+              message: "Session does not exist",
+            });
+            return;
+          }
+          // Restore to Redis cache
+          await redis.hset(`session:${sessionId}`, {
+            status: sessionDb.status,
+            progress: sessionDb.progress,
+          });
+          await redis.expire(`session:${sessionId}`, 86400);
+          currentStatus = sessionDb.status;
+        }
+
         await socket.join(sessionId);
+        socket.data.sessionId = sessionId;
+
+        if (currentStatus === "creating" || currentStatus === "paused") {
+          await redis.hset(`session:${sessionId}`, {
+            status: "active",
+            lastActivity: new Date().toISOString(),
+          });
+
+          if (col) {
+            await col.updateOne(
+              { sessionId: sessionId },
+              { $set: { status: "active" } },
+            );
+          }
+        }
 
         callback({
-            success: true,
-            sessionId: sessionId
+          success: true,
+          message: `Joined session ${sessionId}`,
         });
-    }catch (error) {
+      } catch (error) {
         console.error(error);
         callback({
           success: false,
@@ -142,3 +199,230 @@ export function SessionJoinHandler(socket: Socket) {
     },
   );
 }
+
+export function SessionLeaveHandler(socket: Socket) {
+  const events = Events;
+  socket.on(
+    events.SESSION.LEAVE,
+    async (_, callback: (response: SessionResponse) => void) => {
+      try {
+        const sessionId = socket.data.sessionId;
+        if (!sessionId) {
+          callback({
+            success: false,
+            message: "No session to leave",
+          });
+          return;
+        }
+        socket.leave(sessionId);
+        socket.data.sessionId = undefined;
+        await redis.hset(`session:${sessionId}`, {
+          status: "paused",
+          lastActivity: new Date().toISOString(),
+        });
+        const col = await getSessionCollection();
+        if (col) {
+          await col.updateOne(
+            { sessionId: sessionId },
+            { $set: { status: "paused" } },
+          );
+        }
+        callback({
+          success: true,
+          message: `Left session ${sessionId}`,
+        });
+      } catch (error) {
+        console.error(error);
+        callback({
+          success: false,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+}
+
+// update the session progress in db
+export function SessionUpdateProgressHandler(socket: Socket) {
+  const events = Events;
+
+  socket.on(
+    events.SESSION.UPDATE.PROGRESS,
+    async (
+      progressData: unknown,
+      callback: (response: SessionResponse) => void,
+    ) => {
+      try {
+        const sessionId = socket.data.sessionId;
+        if (!sessionId) {
+          callback({
+            success: false,
+            message: "No session to update",
+          });
+          return;
+        }
+
+        const parsedPayload = UpdateProgressPayloadSchema.safeParse(progressData);
+        if (!parsedPayload.success) {
+          callback({
+            success: false,
+            message: "Invalid progress payload",
+          });
+          return;
+        }
+        const { progress } = parsedPayload.data;
+
+        await redis.hset(`session:${sessionId}`, {
+          progress,
+          lastActivity: new Date().toISOString(),
+        });
+
+        const col = await getSessionCollection();
+        if (col) {
+          const updateResult = await col.updateOne(
+            { sessionId: sessionId },
+            { $set: { progress } },
+          );
+
+          if (updateResult.matchedCount === 0) {
+            callback({
+              success: false,
+              message: "No session found to update in database",
+            });
+            return;
+          }
+        }
+
+        callback({
+          success: true,
+          message: "Progress updated successfully",
+        });
+      } catch (error) {
+        console.error(error);
+        callback({
+          success: false,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+}
+
+// update the session status in db
+export function SessionUpdateStatusHandler(socket: Socket) {
+  const events = Events;
+  socket.on(
+    events.SESSION.UPDATE.STATUS,
+    async (
+      statusData: unknown,
+      callback: (response: SessionResponse) => void,
+    ) => {
+      try {
+        const sessionId = socket.data.sessionId;
+        if (!sessionId) {
+          callback({
+            success: false,
+            message: "No session to update",
+          });
+          return;
+        }
+
+        const parsedPayload = UpdateStatusPayloadSchema.safeParse(statusData);
+        if (!parsedPayload.success) {
+          callback({
+            success: false,
+            message: "Invalid status payload",
+          });
+          return;
+        }
+        const { status } = parsedPayload.data;
+
+        await redis.hset(`session:${sessionId}`, {
+          status,
+          lastActivity: new Date().toISOString(),
+        });
+
+        const col = await getSessionCollection();
+        if (col) {
+          const updateResult = await col.updateOne(
+            { sessionId: sessionId },
+            { $set: { status } },
+          );
+
+          if (updateResult.matchedCount === 0) {
+            callback({
+              success: false,
+              message: "No session found to update in database",
+            });
+            return;
+          }
+        }
+
+        callback({
+          success: true,
+          message: "Status updated successfully",
+        });
+      } catch (error) {
+        console.error(error);
+        callback({
+          success: false,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+}
+
+export function EndSessionHandler(socket: Socket) {
+  const events = Events;
+  socket.on(
+    events.SESSION.END,
+    async (_: any, callback: (response: SessionResponse) => void) => {
+      try {
+        const sessionId = socket.data.sessionId;
+        if (!sessionId) {
+          callback({
+            success: false,
+            message: "No session to end",
+          });
+          return;
+        }
+        await redis.hset(`session:${sessionId}`, {
+          status: "ended",
+          lastActivity: new Date().toISOString(),
+        });
+        socket.leave(sessionId);
+        socket.data.sessionId = undefined;
+        
+        const col = await getSessionCollection();
+        if (!col) {
+          callback({
+            success: false,
+            message: "something went wrong getting the session collection",
+          });
+          return;
+        }
+        
+        await redis.del(`audio_queue:${sessionId}`);
+        await redis.del(`agent_queue:${sessionId}`);
+
+        await col.updateOne(
+          { sessionId: sessionId },
+          { $set: { status: "ended" } },
+        );
+
+        callback({
+          success: true,
+          message: `Ended session ${sessionId}`,
+        });
+      } catch (error) {
+        console.error(error);
+        callback({
+          success: false,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+      }
+    },
+  );
+}
+

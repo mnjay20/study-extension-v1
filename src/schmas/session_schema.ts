@@ -15,13 +15,13 @@ export const SessionSchema = z.object({
 
 
 
-  status: z.enum(["creating",
-    "downloading",
-    "transcribing",
-    "generating_notes",
-    "completed",
-    "failed",
-  ]),
+  status: z.enum([
+  "creating",
+  "active",
+  "paused",
+  "ended",
+  "failed",
+]),
 
   progress: z.number(),
 
@@ -29,6 +29,29 @@ export const SessionSchema = z.object({
 //   updatedAt: z.coerce.date(),
 //   processedAt: z.coerce.date().optional(),
 });
+
+export const RedisSessionSchema = SessionSchema.extend({
+
+  status: z.enum([
+    "creating",
+    "active",
+    "paused",
+    "ended",
+    "failed",
+  ]),
+  progress: z.number(),
+  lastActivity: z.coerce.date().optional(),
+});
+export type RedisSessionType = z.infer<typeof RedisSessionSchema>
+
+export const SessionStatus =  z.enum([
+  "creating",
+  "active",
+  "paused",
+  "ended",
+  "failed",
+]);
+ export type SessionStatusType = z.infer<typeof SessionStatus>
 
 export type SessionType= z.infer<typeof SessionSchema>
 
@@ -44,10 +67,10 @@ export type CreateSessionPayload = z.infer<
   typeof CreateSessionPayloadSchema
 >;
 
-export type CreateSessionResponse =
+export type SessionResponse =
   | {
       success: true;
-      sessionId: string;
+      message: string;
     }
   | {
       success: false;
@@ -55,7 +78,7 @@ export type CreateSessionResponse =
     }
    |
    {
-    message : true,
+    success : true,
     sessionId : string
    } 
 
@@ -63,3 +86,19 @@ export const JoinSessionPayloadSchema = z.object({
   sessionId: z.string()
 })
 export type JoinSessionPayload = z.infer<typeof JoinSessionPayloadSchema>;
+
+
+export const LeaveSessionPayloadSchema = z.object({
+  sessionId: z.string(),
+})
+export type LeaveSessionPayload = z.infer<typeof LeaveSessionPayloadSchema>;
+
+export const UpdateProgressPayloadSchema = z.object({
+  progress: z.number().min(0).max(100),
+});
+export type UpdateProgressPayload = z.infer<typeof UpdateProgressPayloadSchema>;
+
+export const UpdateStatusPayloadSchema = z.object({
+  status: SessionStatus,
+});
+export type UpdateStatusPayload = z.infer<typeof UpdateStatusPayloadSchema>;

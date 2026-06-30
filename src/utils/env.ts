@@ -9,7 +9,9 @@ const envSchema = z.object({
     PORT : z.coerce.number().int().min(1).max(65535),
     MONGO_DB_URI : z.string().min(1,"Mongodb uri is required"),
     MONGO_DB_NAME: z.string().min(1,"Mongodb name is required"),
-    EMBEDDING_MODEL : z.string().default("gemini-embedding-2")
+    EMBEDDING_MODEL : z.string().default("gemini-embedding-2"),
+    REDIS_HOST : z.string().default("127.0.0.1"),
+    REDIS_PORT : z.coerce.number().default(6379)
 
 })
 

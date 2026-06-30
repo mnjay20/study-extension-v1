@@ -5,7 +5,11 @@ export const Events = {
     JOIN: "session:join",
     LEAVE: "session:leave",
     CREATE: "session:create",
-    UPDATE: "session:update",
+    UPDATE: {
+      PROGRESS: "session:update:progress",
+      STATUS: "session:update:status",
+    },
+    END: "session:end",
   },
 
   VIDEO: {
