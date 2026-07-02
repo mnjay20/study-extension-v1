@@ -22,7 +22,7 @@ export const Events = {
 
   FRAME: {
     REQUEST_CONTEXT: "frame:request_context",
-    UPLOAD: "frame:upload",
+    
     RECEIVED: "frame:received",
     PROCESSING: "frame:processing",
     FAILED: "frame:failed",
@@ -40,18 +40,12 @@ export const Events = {
     COMPLETED: "transcript:completed",
 },
 
-  VISION: {
-    PROCESSING_STARTED: "vision:processing_started",
-    CHUNK_READY: "vision:chunk_ready",
-    COMPLETED: "vision:completed",
-  },
+ 
 
   NOTES: {
     PROCESSING_STARTED: "notes:processing_started",
     CHUNK_READY: "notes:chunk_ready",
-    CHAPTER_STARTED: "notes:chapter_started",
-    CHAPTER_COMPLETED: "notes:chapter_completed",
-    UPDATED: "notes:updated",
+    
     COMPLETED: "notes:completed",
 },
 

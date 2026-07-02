@@ -38,11 +38,24 @@ export function transcriptHandler(socket:Socket){
                 createdAt: new Date().toISOString(),
                 }
             
-            callback({
-                success : true,
-                message : `transcripted chunk : ${transcriptChunk}`
-            })    
+          
+            // set transcript chunk in redis hset in a context window
 
+            const isKeyExists = await redis.exists(`context:${sessionId}`);
+            if(isKeyExists === 0){
+            await redis.hset(`context:${sessionId}`,{
+                summary: null,
+                previousChunk: null,
+                currentChunk: JSON.stringify(transcriptChunk)
+            })
+            }else{
+                const previousChunk = await redis.hget(`context:${sessionId}`,'currentChunk')
+
+                await redis.hset(`context:${sessionId}`,{
+                    previousChunk: previousChunk,
+                    currentChunk: JSON.stringify(transcriptChunk)
+                })
+            }
             // will call the agentic pipeline    
             
     

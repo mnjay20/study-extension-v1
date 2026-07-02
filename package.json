@@ -25,6 +25,7 @@
     "@langchain/core": "^1.2.1",
     "@langchain/google": "^0.2.1",
     "@langchain/google-genai": "^2.2.0",
+    "@langchain/langgraph": "^1.4.7",
     "@langchain/mongodb": "^1.2.1",
     "@langchain/textsplitters": "^1.0.1",
     "cors": "^2.8.6",
