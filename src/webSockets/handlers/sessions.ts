@@ -15,6 +15,7 @@ import { Events } from "../../utils/events.js";
 import { getSessionCollection } from "../../database/collections.js";
 import { nanoid } from "nanoid";
 import { redis } from "../../configs/redis.js";
+import { logger } from "../../utils/logger.js";
 
 
 /*
@@ -61,6 +62,7 @@ export function SessionCreateHandler(socket: Socket) {
         const parsedPayload = CreateSessionPayloadSchema.safeParse(payload);
 
         if (!parsedPayload.success) {
+          logger.warn("Session creation payload validation failed: %O", parsedPayload.error);
           callback({
             success: false,
             message: "Invalid payload",
@@ -91,6 +93,7 @@ export function SessionCreateHandler(socket: Socket) {
         };
         const parsed = SessionSchema.safeParse(session);
         if (!parsed.success) {
+          logger.warn("Session format schema validation failed: %O", parsed.error);
           callback({
             success: false,
             message: "Session format is not correct",
@@ -104,12 +107,14 @@ export function SessionCreateHandler(socket: Socket) {
           progress: 0,
         } ); // creates the redis cache object
         await redis.expire(`session:${sessionId}`, 86400);
+        socket.data.videoTitle = videoTitle;
+        logger.info(`Session successfully created: ${sessionId} for video "${videoTitle}" (user: ${userId})`);
         callback({
           success: true,
           sessionId,
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in SessionCreateHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -130,6 +135,7 @@ export function SessionJoinHandler(socket: Socket) {
       try {
         const parsedPayload = JoinSessionPayloadSchema.safeParse(sessionData);
         if (!parsedPayload.success) {
+          logger.warn("Join session schema validation failed for socket %s: %O", socket.id, parsedPayload.error);
           callback({
             success: false,
             message: "Invalid session data",
@@ -153,6 +159,7 @@ export function SessionJoinHandler(socket: Socket) {
           }
           const sessionDb = await col.findOne({ sessionId });
           if (!sessionDb) {
+            logger.warn("Join session request failed: session %s does not exist", sessionId);
             callback({
               success: false,
               message: "Session does not exist",
@@ -183,14 +190,16 @@ export function SessionJoinHandler(socket: Socket) {
               { $set: { status: "active" } },
             );
           }
+          currentStatus = "active";
         }
 
+        logger.info(`Socket ${socket.id} successfully joined session ${sessionId} (status: ${currentStatus})`);
         callback({
           success: true,
           message: `Joined session ${sessionId}`,
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in SessionJoinHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -208,6 +217,7 @@ export function SessionLeaveHandler(socket: Socket) {
       try {
         const sessionId = socket.data.sessionId;
         if (!sessionId) {
+          logger.warn(`Leave session request failed for socket ${socket.id}: socket is not registered to any session`);
           callback({
             success: false,
             message: "No session to leave",
@@ -227,12 +237,13 @@ export function SessionLeaveHandler(socket: Socket) {
             { $set: { status: "paused" } },
           );
         }
+        logger.info(`Socket ${socket.id} successfully left session ${sessionId}`);
         callback({
           success: true,
           message: `Left session ${sessionId}`,
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in SessionLeaveHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -255,6 +266,7 @@ export function SessionUpdateProgressHandler(socket: Socket) {
       try {
         const sessionId = socket.data.sessionId;
         if (!sessionId) {
+          logger.warn(`Update progress request failed for socket ${socket.id}: socket is not registered to any session`);
           callback({
             success: false,
             message: "No session to update",
@@ -264,6 +276,7 @@ export function SessionUpdateProgressHandler(socket: Socket) {
 
         const parsedPayload = UpdateProgressPayloadSchema.safeParse(progressData);
         if (!parsedPayload.success) {
+          logger.warn("Update progress schema validation failed for session %s: %O", sessionId, parsedPayload.error);
           callback({
             success: false,
             message: "Invalid progress payload",
@@ -285,6 +298,7 @@ export function SessionUpdateProgressHandler(socket: Socket) {
           );
 
           if (updateResult.matchedCount === 0) {
+            logger.warn("Update progress failed: session %s not found in database", sessionId);
             callback({
               success: false,
               message: "No session found to update in database",
@@ -293,12 +307,13 @@ export function SessionUpdateProgressHandler(socket: Socket) {
           }
         }
 
+        logger.info(`Session ${sessionId} progress updated to ${progress}%`);
         callback({
           success: true,
           message: "Progress updated successfully",
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in SessionUpdateProgressHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -320,6 +335,7 @@ export function SessionUpdateStatusHandler(socket: Socket) {
       try {
         const sessionId = socket.data.sessionId;
         if (!sessionId) {
+          logger.warn(`Update status request failed for socket ${socket.id}: socket is not registered to any session`);
           callback({
             success: false,
             message: "No session to update",
@@ -329,6 +345,7 @@ export function SessionUpdateStatusHandler(socket: Socket) {
 
         const parsedPayload = UpdateStatusPayloadSchema.safeParse(statusData);
         if (!parsedPayload.success) {
+          logger.warn("Update status schema validation failed for session %s: %O", sessionId, parsedPayload.error);
           callback({
             success: false,
             message: "Invalid status payload",
@@ -350,6 +367,7 @@ export function SessionUpdateStatusHandler(socket: Socket) {
           );
 
           if (updateResult.matchedCount === 0) {
+            logger.warn("Update status failed: session %s not found in database", sessionId);
             callback({
               success: false,
               message: "No session found to update in database",
@@ -358,12 +376,13 @@ export function SessionUpdateStatusHandler(socket: Socket) {
           }
         }
 
+        logger.info(`Session ${sessionId} status updated to "${status}"`);
         callback({
           success: true,
           message: "Status updated successfully",
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in SessionUpdateStatusHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",
@@ -381,6 +400,7 @@ export function EndSessionHandler(socket: Socket) {
       try {
         const sessionId = socket.data.sessionId;
         if (!sessionId) {
+          logger.warn(`End session request failed for socket ${socket.id}: socket is not registered to any session`);
           callback({
             success: false,
             message: "No session to end",
@@ -411,12 +431,13 @@ export function EndSessionHandler(socket: Socket) {
           { $set: { status: "ended" } },
         );
 
+        logger.info(`Session ${sessionId} has been ended and queues cleaned up successfully`);
         callback({
           success: true,
           message: `Ended session ${sessionId}`,
         });
       } catch (error) {
-        console.error(error);
+        logger.error("Error in EndSessionHandler:", error);
         callback({
           success: false,
           message: error instanceof Error ? error.message : "Unknown error",

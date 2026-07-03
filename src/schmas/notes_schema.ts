@@ -78,9 +78,21 @@ const TopicSchema = z.object({
 
 export const NotesSchema = z.object({
   chapter: z.string(),
+  chunkIndex: z.number().int().nonnegative(),
   topics: z.array(TopicSchema),
 });
 export type NotesSchemaType = z.infer<typeof NotesSchema>;
+
+export const LecturNotesSchema = z.object({
+  sessionId: z.string(),
+  videoTitle: z.string(),
+  notes: z.array(NotesSchema),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+  
+
+})
+export type LectureNotesType = z.infer<typeof LecturNotesSchema>
 
 /*
 {

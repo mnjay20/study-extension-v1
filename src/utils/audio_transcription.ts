@@ -4,6 +4,7 @@ import { Worker } from "worker_threads";
 import path from "path";
 import { type TranscriptChunk } from '../schmas/transcript_chunk.js';
 import type { WorkerRes } from "../workers/chunk_worker.js";
+import { logger } from "./logger.js";
 
 
 
@@ -46,27 +47,31 @@ import type { WorkerRes } from "../workers/chunk_worker.js";
 
 export async function transcribeWithWorker(audioPath: string) {
   return new Promise<String>((resolve, reject) => {
+    logger.info(`Spawning transcription worker thread for file: ${audioPath}`);
     const worker = new Worker(new URL("../workers/chunk_worker.js", import.meta.url));
 
     worker.postMessage({ audioPath });
 
     worker.once("message", (result: WorkerRes) => {
       if (!result.success) {
+        logger.error(`Transcription worker thread returned failure for ${audioPath}: ${result.error}`);
         reject(result.error)
       } else {
-
+        logger.info(`Transcription worker thread successfully completed transcription for ${audioPath}`);
         resolve(result.text!)
       }
       worker.terminate();
     });
 
     worker.once("error", (err) => {
+      logger.error(`Transcription worker thread encountered process error for ${audioPath}:`, err);
       reject(err);
       worker.terminate();
     });
 
     worker.once("exit", (code) => {
       if (code !== 0) {
+        logger.error(`Transcription worker thread exited with non-zero exit code: ${code} for ${audioPath}`);
         reject(new Error(`Worker stopped with exit code ${code}`));
       }
     });

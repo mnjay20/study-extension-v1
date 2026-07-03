@@ -1,38 +1,37 @@
-import { Annotation } from "@langchain/langgraph";
-import { type NotesSchemaType } from '../schmas/notes_schema.js';
+import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
+import { type NotesSchemaType } from "../schmas/notes_schema.js";
+import { stateLoader } from "./state_loader.js";
+import { notesAgentNode } from "./notes_agent.js";
+import { summaryAgentNode } from "./summaryAgent.js";
+import { sendAndsaveNode } from "./store_in_db.js";
 
-export const NotesState = Annotation.Root({
-  // Context
+export const GraphState = Annotation.Root({
+  chunkIndex: Annotation<number>(),
+  videoTitle: Annotation<string>(),
   sessionId: Annotation<string>(),
-
-  // Current chunk (the source of truth)
   transcript: Annotation<string>(),
-
-  // Rolling context
   rollingSummary: Annotation<string>(),
-
-  // Previous transcript (for continuity only)
   previousTranscript: Annotation<string>(),
-
-  // Chunk timestamps
   startTimestamp: Annotation<number>(),
   endTimestamp: Annotation<number>(),
-
-  // Notes generated for this chunk
   notes: Annotation<NotesSchemaType | null>(),
 
-  // Whether a visual is required
-  needsVisualContext: Annotation<boolean>(),
-
-  // Visual context returned by the tool
-  visualContext: Annotation<{
-    mimeType: string;
-    frameData: string;
-  } | null>(),
-
-  // Final output
-  output: Annotation<NotesSchemaType | null>(),
-
-  // Error handling
-  error: Annotation<string | null>(),
+  // // Error handling
+  // error: Annotation<string | null>(),
 });
+
+export type State = typeof GraphState.State;
+
+export const graph = new StateGraph(GraphState)
+  .addNode("stateLoaderNode", stateLoader)
+  .addNode("notesAgentNode", notesAgentNode)
+  .addNode("summaryAgentNode", summaryAgentNode)
+  .addNode("sendAndsaveNode", sendAndsaveNode)
+  .addEdge(START, "stateLoaderNode")
+  .addEdge("stateLoaderNode", "notesAgentNode")
+  .addEdge("notesAgentNode", "summaryAgentNode")
+  .addEdge("notesAgentNode", "sendAndsaveNode")
+  .addEdge("summaryAgentNode", END)
+  .addEdge("sendAndsaveNode", END)
+  .compile();
+

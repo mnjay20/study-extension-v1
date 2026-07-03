@@ -2,23 +2,24 @@ import type { Collection } from "mongodb";
 import { getDb } from "./mongo.js";
 
 
-let TranscriptChunkCollecion : Promise<Collection> | null = null
+let NotesCollection : Promise<Collection> | null = null
 let SessionCollection : Promise<Collection> | null = null
 
-export async function getTranscriptChunkCollecion(): Promise<Collection>{
-    if(!TranscriptChunkCollecion){
-        TranscriptChunkCollecion = (async ()=>{
+export async function getNotesCollection(): Promise<Collection>{
+    if(!NotesCollection){
+        NotesCollection = (async ()=>{
             const db = await getDb()
-            const col = db.collection("Transcript-Cache")
-            await col.createIndex(
-              { createdAt: 1 },
-              { expireAfterSeconds: 60*60*24 }
-            )
+            const col = db.collection("Notes-Cache")
+            await col.createIndex({ sessionId: 1 }, { unique: true })
+            // await col.createIndex(
+            //   { createdAt: 1 },
+            //   { expireAfterSeconds: 60*60*24 }
+            // )
             return col
         })()
-        return TranscriptChunkCollecion!
+        return NotesCollection!
     }
-    return TranscriptChunkCollecion!
+    return NotesCollection!
 }
     
 export async function getSessionCollection(): Promise<Collection>{
@@ -29,10 +30,10 @@ export async function getSessionCollection(): Promise<Collection>{
             await Promise.all([
                 sessions.createIndex({ sessionId: 1 }, { unique: true }),
                 sessions.createIndex({ userId: 1 }),
-                sessions.createIndex(
-                  { createdAt: 1 },
-                  { expireAfterSeconds: 60*60*24 }
-                ),
+                // sessions.createIndex(
+                //   { createdAt: 1 },
+                //   { expireAfterSeconds: 60*60*24 }
+                // ),
             ]);
             return sessions
         })()

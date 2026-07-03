@@ -9,11 +9,12 @@ export type DownloadStartedPayload = z.infer<typeof downloadStartedPayloadSchema
 
 export const TranscriptChunkSchema = z.object({
   sessionId: z.string(),
+  videoTitle: z.string(),
   chunkIndex: z.number().int().nonnegative(),
   startAt: z.number().nonnegative(),
   endAt: z.number().nonnegative(),
   text: z.string(),
-  createdAt : z.string().transform((str) => new Date(str).toISOString()),
+  
 });
 
 export type TranscriptChunk = z.infer<typeof TranscriptChunkSchema>;

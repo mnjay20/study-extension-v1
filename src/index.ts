@@ -10,6 +10,8 @@ import { env } from './utils/env.js'
 
 import { registerSocketHandlers } from './webSockets/connections.js';
 
+import { logger } from './utils/logger.js'
+
 const app = express()
 
 app.use(cors({
@@ -23,6 +25,6 @@ initSocketServer(httpServer)
 registerSocketHandlers()
 
 httpServer.listen(env.PORT,()=>{
-    console.log('server is listening on ', env.PORT)
+    logger.info(`server is listening on port ${env.PORT}`)
 })
 

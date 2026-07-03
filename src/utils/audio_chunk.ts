@@ -6,6 +6,7 @@ import { spawnYtdlp } from './load_audio.js';
 import { mkdir, rm } from "fs/promises";
 import { getIO } from '../webSockets/server.js';
 import { Events } from './events.js';
+import { logger } from './logger.js';
 
 
 
@@ -52,11 +53,11 @@ export async function audioChunker(url: string, chunk_size: number, sessionId: s
     ytdlp.stdout.pipe(ffmpeg.stdin);
 
     ffmpeg.stderr.on("data", (data) => {
-        console.error("ffmpeg stderr:", data.toString());
+        logger.error(`ffmpeg stderr: ${data.toString()}`);
     });
 
     ytdlp.stderr.on("data", (data) => {
-        console.error("yt-dlp stderr:", data.toString());
+        logger.error(`yt-dlp stderr: ${data.toString()}`);
     });
     const io = getIO();
     const events = Events;

@@ -8,6 +8,7 @@ import { env } from "../../utils/env.js";
 import { Events } from "../../utils/events.js";
 import { getIO } from "../server.js";
 import { redis } from "../../configs/redis.js";
+import { logger } from "../../utils/logger.js";
 
 export function downloadAndChunkingHandler(socket: any) {
   const io = getIO();
@@ -18,22 +19,17 @@ export function downloadAndChunkingHandler(socket: any) {
       const sessionId = socket.data.sessionId;
       try {
          if (!sessionId) {
-          console.error("Session ID not found for socket:", socket.id);
-          return;
+          throw new Error(`Session ID not found for socket: ${socket.id}`);
         }
         const parsedData = downloadStartedPayloadSchema.safeParse(data);
         if (!parsedData.success) {
-          console.error(
-            "Invalid data for download started event:",
-            parsedData.error,
-          );
-          return;
+          throw new Error(`Invalid data for download started event: ${parsedData.error.message}`);
         }
 
         const { videoUrl, userId } = parsedData.data;
 
        
-        console.log(`Download started for video: ${videoUrl}, user: ${userId}`);
+        logger.info(`Download started for video: ${videoUrl}, user: ${userId}`);
 
         io.to(sessionId).emit(events.AUDIO.DOWNLOAD_STARTED, {
           success: true,
@@ -67,7 +63,7 @@ export function downloadAndChunkingHandler(socket: any) {
           userId,
         });
       } catch (err) {
-        console.error("Error in downloadStartedHandler:", err);
+        logger.error("Error in downloadStartedHandler:", err);
         io.to(sessionId).emit(events.AUDIO.DOWNLOAD_STARTED, {
           success: false,
           message: `Error processing download started event: ${err instanceof Error ? err.message : String(err)}`,

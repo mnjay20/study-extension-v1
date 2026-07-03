@@ -1,6 +1,7 @@
 import fs from 'fs';
 import pkg from 'wavefile';
 import { getTranscriber } from '../configs/whisper_model.js';
+import { logger } from './logger.js';
 const { WaveFile } = pkg;
 
 /**
@@ -9,16 +10,16 @@ const { WaveFile } = pkg;
  */
 export async function transcribe(audioFilePath : string) {
   try{
-  console.log('Loading pipeline and Whisper model (this may take a moment)...');
+  logger.info('Loading pipeline and Whisper model (this may take a moment)...');
   
   // Initialize the automatic speech recognition pipeline using Hugging Face Transformers.js (v3)
   const transcriber = await getTranscriber()
-  console.log('Reading audio file...');
+  logger.info('Reading audio file...');
   const buffer = fs.readFileSync(audioFilePath);
   const wav = new WaveFile(buffer);
 
   // Normalize bit depth to 32-bit floating point and resample to 16000Hz (required by Whisper)
-  console.log('Resampling to 16kHz and normalizing bit depth...');
+  logger.info('Resampling to 16kHz and normalizing bit depth...');
   wav.toBitDepth('32f');
   wav.toSampleRate(16000);
 
@@ -27,7 +28,7 @@ export async function transcribe(audioFilePath : string) {
 
   // Downmix to mono if multi-channel (stereo)
   if (Array.isArray(samples)) {
-    console.log(`Downmixing ${samples.length} channels to mono...`);
+    logger.info(`Downmixing ${samples.length} channels to mono...`);
     const numChannels = samples.length;
     const numSamples = samples[0].length;
     const mono = new Float32Array(numSamples);
@@ -41,20 +42,20 @@ export async function transcribe(audioFilePath : string) {
     samples = mono;
   }
 
-  console.log('Transcribing...');
+  logger.info('Transcribing...');
   const start = Date.now();
   
   // Run the audio through the model
   const result : any= await transcriber(samples);
 
   const duration = ((Date.now() - start) / 1000).toFixed(2);
-  console.log(`\n--- Transcription Done in ${duration}s ---`);
+  logger.info(`--- Transcription Done in ${duration}s ---`);
   
   // 1. Direct clean transcript logging
 
   return result.text
 }catch(error){
-  console.error("transcription failed")
+  logger.error("transcription failed", error);
   throw error
 }
 
