@@ -14,6 +14,7 @@ import {
 } from "./handlers/sessions.js";
 import { downloadAndChunkingHandler } from "./handlers/audio_chunking.js";
 import { transcriptHandler } from "./handlers/transcription.js";
+import { searchQueryHandler } from "./handlers/search_query.js";
 
 export function registerSocketHandlers() {
     const io = getIO()
@@ -48,5 +49,6 @@ export function registerSocketHandlers() {
         //audio chunking event handlers
         downloadAndChunkingHandler(socket)
         transcriptHandler(socket)
+        searchQueryHandler(socket)
     })
 }

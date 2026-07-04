@@ -2,14 +2,15 @@ import type { Collection } from "mongodb";
 import { getDb } from "./mongo.js";
 
 
-let NotesCollection : Promise<Collection> | null = null
-let SessionCollection : Promise<Collection> | null = null
+let NotesCollection: Promise<Collection> | null = null
+let SessionCollection: Promise<Collection> | null = null
+let EmbeddingsCollection: Promise<Collection> | null = null
 
-export async function getNotesCollection(): Promise<Collection>{
-    if(!NotesCollection){
-        NotesCollection = (async ()=>{
+export async function getNotesCollection(): Promise<Collection> {
+    if (!NotesCollection) {
+        NotesCollection = (async () => {
             const db = await getDb()
-            const col = db.collection("Notes-Cache")
+            const col = db.collection("Notes")
             await col.createIndex({ sessionId: 1 }, { unique: true })
             // await col.createIndex(
             //   { createdAt: 1 },
@@ -21,10 +22,10 @@ export async function getNotesCollection(): Promise<Collection>{
     }
     return NotesCollection!
 }
-    
-export async function getSessionCollection(): Promise<Collection>{
-    if(!SessionCollection){
-        SessionCollection = (async ()=>{
+
+export async function getSessionCollection(): Promise<Collection> {
+    if (!SessionCollection) {
+        SessionCollection = (async () => {
             const db = await getDb()
             const sessions = db.collection('Sessions')
             await Promise.all([
@@ -37,7 +38,24 @@ export async function getSessionCollection(): Promise<Collection>{
             ]);
             return sessions
         })()
-        return SessionCollection
+        return SessionCollection!
     }
     return SessionCollection!
+}
+
+export async function getEmbeddingsCollection(): Promise<Collection> {
+    if (!EmbeddingsCollection) {
+        EmbeddingsCollection = (async () => {
+            const db = await getDb()
+            const col = db.collection("Embeddings")
+            await col.createIndex({ sessionId: 1 }, { unique: true })
+            // await col.createIndex(
+            //   { createdAt: 1 },
+            //   { expireAfterSeconds: 60*60*24 }
+            // )
+            return col
+        })()
+        return EmbeddingsCollection!
+    }
+    return EmbeddingsCollection!
 }

@@ -105,7 +105,7 @@ export function SessionCreateHandler(socket: Socket) {
         await redis.hset(`session:${sessionId}`, {
           status: "creating",
           progress: 0,
-        } ); // creates the redis cache object
+        }); // creates the redis cache object
         await redis.expire(`session:${sessionId}`, 86400);
         socket.data.videoTitle = videoTitle;
         logger.info(`Session successfully created: ${sessionId} for video "${videoTitle}" (user: ${userId})`);
@@ -413,7 +413,7 @@ export function EndSessionHandler(socket: Socket) {
         });
         socket.leave(sessionId);
         socket.data.sessionId = undefined;
-        
+
         const col = await getSessionCollection();
         if (!col) {
           callback({
@@ -422,7 +422,7 @@ export function EndSessionHandler(socket: Socket) {
           });
           return;
         }
-        
+
         await redis.del(`audio_queue:${sessionId}`);
         await redis.del(`agent_queue:${sessionId}`);
 
