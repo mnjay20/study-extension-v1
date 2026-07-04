@@ -31,8 +31,18 @@ export function transcriptHandler(socket: Socket) {
 
             const paresedChunk = JSON.parse(audioChunk[0]!);
             logger.info(`Processing chunkIndex: ${paresedChunk.chunkIndex} in session: ${sessionId}`);
-            const transcript = await transcribeWithWorker(paresedChunk.path);
-            await unlink(paresedChunk.path)
+            
+            let transcript: String;
+            try {
+                transcript = await transcribeWithWorker(paresedChunk.path);
+            } finally {
+                try {
+                    await unlink(paresedChunk.path);
+                } catch (err) {
+                    logger.error(`Failed to delete temporary audio file: ${paresedChunk.path}`, err);
+                }
+            }
+
             const sessionCol = await getSessionCollection();
             const session = await sessionCol.findOne({ sessionId });
             const videoTitle = session?.videoTitle ?? "Unknown Video";

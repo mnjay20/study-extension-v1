@@ -52,7 +52,17 @@ export async function transcribeWithWorker(audioPath: string) {
 
     worker.postMessage({ audioPath });
 
+    const exitListener = (code: number) => {
+      if (code !== 0) {
+        logger.error(`Transcription worker thread exited with non-zero exit code: ${code} for ${audioPath}`);
+        reject(new Error(`Worker stopped with exit code ${code}`));
+      }
+    };
+
+    worker.once("exit", exitListener);
+
     worker.once("message", (result: WorkerRes) => {
+      worker.off("exit", exitListener);
       if (!result.success) {
         logger.error(`Transcription worker thread returned failure for ${audioPath}: ${result.error}`);
         reject(result.error)
@@ -64,16 +74,10 @@ export async function transcribeWithWorker(audioPath: string) {
     });
 
     worker.once("error", (err) => {
+      worker.off("exit", exitListener);
       logger.error(`Transcription worker thread encountered process error for ${audioPath}:`, err);
       reject(err);
       worker.terminate();
-    });
-
-    worker.once("exit", (code) => {
-      if (code !== 0) {
-        logger.error(`Transcription worker thread exited with non-zero exit code: ${code} for ${audioPath}`);
-        reject(new Error(`Worker stopped with exit code ${code}`));
-      }
     });
   });
 }

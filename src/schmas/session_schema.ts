@@ -71,16 +71,17 @@ export type SessionResponse =
   | {
       success: true;
       message: string;
+      notes?: any[];
     }
   | {
       success: false;
       message: string;
     }
-   |
-   {
-    success : true,
-    sessionId : string
-   } 
+  | {
+      success: true;
+      sessionId: string;
+      notes?: any[];
+    } 
 
 export const JoinSessionPayloadSchema = z.object({
   sessionId: z.string()

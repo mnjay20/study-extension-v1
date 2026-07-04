@@ -22,6 +22,10 @@ export const getFrame = tool(({ timestamp, sessionId }) => {
     logger.info(`getFrame tool invoked for sessionId: ${sessionId} at timestamp: ${timestamp}s`);
     const io = getIO()
     const response = new Promise<outputSchemaType>((resolve, reject) => {
+        if (!io) {
+            reject(new Error("Socket.IO (io) not initialized. getFrame tool is unavailable."));
+            return;
+        }
         io.to(sessionId).timeout(2000).emit(events.REQUEST_CONTEXT, { timestamp }, (err: any, responses: any[]) => {
             if (err) {
                 if (responses && responses.length > 0) {

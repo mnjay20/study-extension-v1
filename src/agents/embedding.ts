@@ -24,42 +24,45 @@ export type embeddingWindowType = z.infer<typeof embeddingWindow>
 
 export const updateWindowNode = async (state: State) => {
     try {
-        const chapter = state.notes?.chapter
-        const notestext = state.notes?.topics.map(topic => {
+        const chapter = state.notes?.chapter ?? "";
+        const notestext = state.notes?.topics?.map(topic => {
             const notes = `${topic.title}\n` + topic.blocks.map(block => {
                 if (block.type === "heading") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "paragraph") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "list") {
-                    return block.type + "\n" + block.items.join("\n")
+                    return block.type + "\n" + (block.items?.join("\n") ?? "")
                 }
                 if (block.type === "code") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "table") {
-                    return block.type + "\n" + block.headers.join("\t") + block.rows.join("\n")
+                    const headersStr = block.headers?.join("\t") ?? "";
+                    const rowsStr = block.rows?.map(row => row.join("\t")).join("\n") ?? "";
+                    return block.type + "\n" + headersStr + "\n" + rowsStr;
                 }
                 if (block.type === "formula") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "callout") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "diagram") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "example") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
                 if (block.type === "quote") {
-                    return block.type + "\n" + block.content
+                    return block.type + "\n" + (block.content ?? "")
                 }
+                return "";
             }).join("\n")
             return notes
-        }).join("\n")
+        }).join("\n") ?? "";
 
         const finalText = chapter + "\n" + notestext
         const embeddingWindowChunk = {

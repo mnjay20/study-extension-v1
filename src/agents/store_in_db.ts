@@ -14,11 +14,15 @@ export const sendAndsaveNode = async (state: State) => {
         logger.info(`Sending notes chunk to client and saving in DB for session: ${state.sessionId}, chunkIndex: ${state.chunkIndex}`);
         const events = Events.NOTES;
         const io = getIO();
-        io.to(state.sessionId).emit(events.CHUNK_READY, {
-            notes: state.notes,
-            startAt : state.startTimestamp,
-            endAt : state.endTimestamp,
-        });
+        if (io) {
+            io.to(state.sessionId).emit(events.CHUNK_READY, {
+                notes: state.notes,
+                startAt : state.startTimestamp,
+                endAt : state.endTimestamp,
+            });
+        } else {
+            logger.warn(`Socket.IO (io) not initialized. Skipping CHUNK_READY event for session: ${state.sessionId}`);
+        }
         
         const col = await getNotesCollection();
         const notesData = await col.findOne({ sessionId: state.sessionId });

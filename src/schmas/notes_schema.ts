@@ -1,75 +1,29 @@
 import { z } from "zod";
 
-const HeadingBlock = z.object({
-  type: z.literal("heading"),
-  level: z.number().min(1).max(6),
-  content: z.string(),
+const NoteBlock = z.object({
+  type: z.enum([
+    "heading",
+    "paragraph",
+    "list",
+    "code",
+    "table",
+    "formula",
+    "callout",
+    "diagram",
+    "example",
+    "quote",
+  ]).describe("The type of notes block."),
+  content: z.string().optional().describe("The content of the block. Used for heading, paragraph, code, formula, callout, diagram, example, quote."),
+  level: z.number().min(1).max(6).optional().describe("The level of the heading block (1-6)."),
+  style: z.enum(["bullet", "numbered"]).optional().describe("The style of the list block."),
+  items: z.array(z.string()).optional().describe("The items of the list block."),
+  language: z.string().optional().describe("The language of the code block."),
+  headers: z.array(z.string()).optional().describe("The headers of the table block."),
+  rows: z.array(z.array(z.string())).optional().describe("The rows of the table block."),
+  variant: z.enum(["info", "warning", "tip", "important"]).optional().describe("The variant/type of callout block."),
+  format: z.enum(["mermaid", "svg", "text"]).optional().describe("The format of the diagram block."),
+  title: z.string().optional().describe("The title of the example block."),
 });
-
-const ParagraphBlock = z.object({
-  type: z.literal("paragraph"),
-  content: z.string(),
-});
-
-const ListBlock = z.object({
-  type: z.literal("list"),
-  style: z.enum(["bullet", "numbered"]),
-  items: z.array(z.string()),
-});
-
-const CodeBlock = z.object({
-  type: z.literal("code"),
-  language: z.string(),
-  content: z.string(),
-});
-
-const TableBlock = z.object({
-  type: z.literal("table"),
-  headers: z.array(z.string()),
-  rows: z.array(z.array(z.string())),
-});
-
-const FormulaBlock = z.object({
-  type: z.literal("formula"),
-  content: z.string(),
-});
-
-const CalloutBlock = z.object({
-  type: z.literal("callout"),
-  variant: z.enum(["info", "warning", "tip", "important"]),
-  content: z.string(),
-});
-
-const DiagramBlock = z.object({
-  type: z.literal("diagram"),
-  format: z.enum(["mermaid", "svg", "text"]),
-  content: z.string(),
-});
-
-const ExampleBlock = z.object({
-  type: z.literal("example"),
-  title: z.string().optional(),
-  content: z.string(),
-});
-
-const QuoteBlock = z.object({
-  type: z.literal("quote"),
-  content: z.string(),
-});
-
-
-const NoteBlock = z.discriminatedUnion("type", [
-  HeadingBlock,
-  ParagraphBlock,
-  ListBlock,
-  CodeBlock,
-  TableBlock,
-  FormulaBlock,
-  CalloutBlock,
-  DiagramBlock,
-  ExampleBlock,
-  QuoteBlock,
-]);
 
 const TopicSchema = z.object({
   title: z.string(),

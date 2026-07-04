@@ -12,10 +12,11 @@ import {
   type SessionStatusType,
 } from "../../schmas/session_schema.js";
 import { Events } from "../../utils/events.js";
-import { getSessionCollection } from "../../database/collections.js";
+import { getSessionCollection, getNotesCollection } from "../../database/collections.js";
 import { nanoid } from "nanoid";
 import { redis } from "../../configs/redis.js";
 import { logger } from "../../utils/logger.js";
+import { rm } from "fs/promises";
 
 
 /*
@@ -193,10 +194,16 @@ export function SessionJoinHandler(socket: Socket) {
           currentStatus = "active";
         }
 
-        logger.info(`Socket ${socket.id} successfully joined session ${sessionId} (status: ${currentStatus})`);
+        // Check if notes already exist in the database for this sessionId
+        const notesCol = await getNotesCollection();
+        const notesDoc = await notesCol.findOne({ sessionId });
+        const existingNotes = notesDoc ? notesDoc.notes : [];
+
+        logger.info(`Socket ${socket.id} successfully joined session ${sessionId} (status: ${currentStatus}, existingNotesCount: ${existingNotes.length})`);
         callback({
           success: true,
           message: `Joined session ${sessionId}`,
+          notes: existingNotes,
         });
       } catch (error) {
         logger.error("Error in SessionJoinHandler:", error);
@@ -425,6 +432,12 @@ export function EndSessionHandler(socket: Socket) {
 
         await redis.del(`audio_queue:${sessionId}`);
         await redis.del(`agent_queue:${sessionId}`);
+
+        try {
+          await rm(`cache/${sessionId}`, { recursive: true, force: true });
+        } catch (err) {
+          logger.error(`Failed to clean up cache directory for session ${sessionId}:`, err);
+        }
 
         await col.updateOne(
           { sessionId: sessionId },
