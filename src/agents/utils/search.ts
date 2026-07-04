@@ -2,62 +2,91 @@ import { embeddings, model } from "../../configs/gemini.js";
 import { getEmbeddingsCollection } from "../../database/collections.js";
 import { env } from "../../utils/env.js";
 import { logger } from "../../utils/logger.js";
-import { ragPrompt } from "../prompts/prompts.js";
-
+import { ragAgentPrompt } from "../prompts/prompts.js";
+import { createAgent, tool } from "langchain";
+import z from "zod";
 
 export async function search(sessionId: string, query: string) {
     try {
-        const embedding = await embeddings.embedQuery(query);
-        const col = await getEmbeddingsCollection();
-        const docs = await col
-            .aggregate([
-                {
-                    $vectorSearch: {
-                        index: env.VECTOR_INDEX,
-                        path: "embeddings",
-                        queryVector: embedding,
-                        filter: {
-                            sessionId: sessionId,
-                        },
-                        numCandidates: 100,
-                        limit: 3,
-                    },
-                },
-                {
-                    $project: {
-                        _id: 0,
-                        sessionId: 1,
-                        chunkId: 1,
-                        notes: 1,
-                        createdAt: 1,
-                        score: {
-                            $meta: "vectorSearchScore",
-                        },
-                    },
-                },
-            ])
-            .toArray();
+        let retrievedDocs: any[] = [];
 
-        const combinedNotesText = docs.map(chunk => chunk.notes).join('\n\n')
+        const searchNotesTool = tool(async ({ searchQuery }: { searchQuery: string }) => {
+            try {
+                const embedding = await embeddings.embedQuery(searchQuery);
+                const col = await getEmbeddingsCollection();
+                const docs = await col
+                    .aggregate([
+                        {
+                            $vectorSearch: {
+                                index: env.VECTOR_INDEX,
+                                path: "embeddings",
+                                queryVector: embedding,
+                                filter: {
+                                    sessionId: sessionId,
+                                },
+                                numCandidates: 100,
+                                limit: 3,
+                            },
+                        },
+                        {
+                            $project: {
+                                _id: 0,
+                                sessionId: 1,
+                                chunkId: 1,
+                                notes: 1,
+                                createdAt: 1,
+                                score: {
+                                    $meta: "vectorSearchScore",
+                                },
+                            },
+                        },
+                    ])
+                    .toArray();
 
-        const combinedScores = docs.length > 0 
-            ? docs.reduce((total, chunk) => total + chunk.score, 0) / docs.length
+                retrievedDocs = docs;
+                return docs.map(chunk => chunk.notes).join("\n\n");
+            } catch (err) {
+                logger.error(`Error in searchNotesTool for query ${searchQuery}:`, err);
+                return "Error: Failed to retrieve notes from vector search.";
+            }
+        }, {
+            name: "searchNotes",
+            description: "Searches the lecture notes using vector search to find relevant information.",
+            schema: z.object({
+                searchQuery: z.string().describe("The search query to match against lecture notes.")
+            })
+        });
+
+        const ragAgent = createAgent({
+            model: model,
+            systemPrompt: ragAgentPrompt,
+            tools: [searchNotesTool],
+            name: "ragAgent"
+        });
+
+        const responseMsg = await ragAgent.invoke({
+            messages: [
+                {
+                    role: "user",
+                    content: query
+                }
+            ]
+        });
+
+        const messages = responseMsg.messages;
+        const lastMessage = messages[messages.length - 1];
+        const answer = lastMessage && lastMessage.content
+            ? (typeof lastMessage.content === 'string' ? lastMessage.content : String(lastMessage.content))
+            : "The answer cannot be determined from the available lecture context.";
+        
+        const combinedScores = retrievedDocs.length > 0 
+            ? retrievedDocs.reduce((total, chunk) => total + chunk.score, 0) / retrievedDocs.length
             : 0;
-
-        logger.info(`Found ${docs.length} similar documents for query: ${query}`);
-        logger.info(`generating answer from the retrived docs`)
-
-        const promptText = ragPrompt
-            .replace("{{retrieved_chunks}}", combinedNotesText)
-            .replace("{{question}}", query);
-
-        const responseMsg = await model.invoke(promptText);
-        const answer = typeof responseMsg.content === 'string' ? responseMsg.content : String(responseMsg.content);
 
         return {
             answer,
             score: combinedScores,
-            chunks: docs.map(chunk => {
+            chunks: retrievedDocs.map(chunk => {
                 return {
                     chunkId: chunk.chunkId,
                     notes: chunk.notes,
@@ -65,7 +94,7 @@ export async function search(sessionId: string, query: string) {
                     score: chunk.score
                 }
             })
-        }
+        };
 
     } catch (error) {
         logger.error("Error in rag:", error)

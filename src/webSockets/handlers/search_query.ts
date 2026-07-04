@@ -11,7 +11,7 @@ const querySchema = z.object({
 
 export async function searchQueryHandler(socket: Socket) {
     const events = Events
-    socket.on(events.SEARCH.QUERY, async (payload) => {
+    socket.on(events.SEARCH.QUERY, async (payload, callback) => {
         try {
             const session = socket.data.sessionId
             if (!session) {
@@ -28,20 +28,33 @@ export async function searchQueryHandler(socket: Socket) {
             const searchAnswer = await search(session, query)
 
             logger.info(`Generated answer for query: ${query}`);
-            socket.emit(events.SEARCH.RESULTS, {
+            
+            const results = {
                 success: true,
                 answer: searchAnswer.answer,
                 score: searchAnswer.score,
                 chunks: searchAnswer.chunks
-            })
+            };
 
+            socket.emit(events.SEARCH.RESULTS, results);
+            
+            if (callback) {
+                callback(results);
+            }
 
         } catch (error) {
             logger.error('Error handling search query event', error)
-            socket.emit(events.ERROR.GENERAL, {
+            
+            const errorResult = {
                 success: false,
                 message: error instanceof Error ? error.message : "Error occurred in search query handler"
-            })
+            };
+
+            socket.emit(events.ERROR.GENERAL, errorResult);
+
+            if (callback) {
+                callback(errorResult);
+            }
         }
     })
 }
