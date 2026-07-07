@@ -12,25 +12,13 @@ export const Events = {
     END: "session:end",
   },
 
-  VIDEO: {
-    PLAY: "video:play",
-    PAUSE: "video:pause",
-    SEEK: "video:seek",
-    END: "video:end",
-    PLAYBACK_RATE: "video:playback_rate",
-  },
 
-  FRAME: {
-    REQUEST_CONTEXT: "frame:request_context",
-    
-    RECEIVED: "frame:received",
-    PROCESSING: "frame:processing",
-    FAILED: "frame:failed",
-},
+
+
 
   AUDIO: {
     DOWNLOAD_STARTED: "audio:download_started",
-    
+
     CHUNKING_COMPLETED: "audio:chunking_completed",
   },
 
@@ -38,16 +26,16 @@ export const Events = {
     CHUNK_READY: "transcript:chunk_ready",
     NEXT_CHUNK: "transcript:next_chunk",
     COMPLETED: "transcript:completed",
-},
+  },
 
- 
+
 
   NOTES: {
     PROCESSING_STARTED: "notes:processing_started",
     CHUNK_READY: "notes:chunk_ready",
-    
+
     COMPLETED: "notes:completed",
-},
+  },
 
   EMBEDDING: {
     STARTED: "embedding:started",

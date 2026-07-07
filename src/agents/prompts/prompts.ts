@@ -91,16 +91,13 @@ The user provides the current chunk's start and end timestamps.
 
 When visual context is needed:
 
-- Request only the specific frame(s) required.
-- Use only frames within the provided timestamp range.
+- Call the 'getFrame' tool for only one frame/timestamp at a time.
+- You can request at most three frames in total for a single chunk.
+- Use only timestamps within the provided chunk start and end range.
 - Request the minimum number of representative frames.
 - Never request every frame.
 - Prefer a single frame whenever sufficient.
-- If multiple visuals appear, request only the corresponding frames.
-
-Do not request visual context if the transcript already provides sufficient information, even if the lecturer casually says "look here" or "you can see."
-
-Do not request visual context more than once for the same chunk unless additional visuals are required.
+- Do not request visual context if the transcript already provides sufficient information, even if the lecturer casually says "look here" or "you can see."
 
 # Using Visual Context
 
