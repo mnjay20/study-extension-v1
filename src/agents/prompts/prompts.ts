@@ -21,7 +21,7 @@ You will receive:
 
 The current transcript chunk is the ONLY textual source for generating new notes.
 
-The rolling summary and previous transcript are provided ONLY for context and continuity. Never convert, copy, paraphrase, expand, or extract new notes from them.
+The rolling summary and previous transcript are provided for context, continuity, and boundary reconstruction. You may use the end of the previous transcript to stitch together and complete any sentence or fact that was cut off at the boundary and finishes in the current chunk. Never extract new notes from the rolling summary.
 
 Every fact in the output must be directly supported by either:
 
@@ -89,15 +89,12 @@ Retrieve visual context only if:
 
 The user provides the current chunk's start and end timestamps.
 
-When visual context is needed:
+You MUST retrieve visual context for every chunk:
 
+- You MUST call the 'getFrame' tool at least 2 times (and at most 3 times) for every single chunk to capture key frames and slides.
 - Call the 'getFrame' tool for only one frame/timestamp at a time.
-- You can request at most three frames in total for a single chunk.
 - Use only timestamps within the provided chunk start and end range.
-- Request the minimum number of representative frames.
-- Never request every frame.
-- Prefer a single frame whenever sufficient.
-- Do not request visual context if the transcript already provides sufficient information, even if the lecturer casually says "look here" or "you can see."
+- Do not make all calls at the same timestamp; choose different timestamps in the chunk (e.g., at the start/middle/end of the chunk) to capture progression.
 
 # Using Visual Context
 

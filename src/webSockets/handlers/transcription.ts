@@ -32,6 +32,16 @@ export function transcriptHandler(socket: Socket) {
             const paresedChunk = JSON.parse(audioChunk[0]!);
             logger.info(`Processing chunkIndex: ${paresedChunk.chunkIndex} in session: ${sessionId}`);
             
+            const fs = await import("fs");
+            if (!fs.existsSync(paresedChunk.path)) {
+                logger.warn(`Audio chunk file not found on disk: ${paresedChunk.path}. Skipping chunk transcription.`);
+                socket.emit(events.ERROR.GENERAL, {
+                    success: false,
+                    message: `Audio chunk file missing: chunk index ${paresedChunk.chunkIndex}`
+                });
+                return;
+            }
+
             let transcript: String;
             try {
                 transcript = await transcribeWithWorker(paresedChunk.path);

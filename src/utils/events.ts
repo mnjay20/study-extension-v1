@@ -76,6 +76,7 @@ export const Events = {
   USER: {
     ONLINE: "user:online",
     OFFLINE: "user:offline",
+    SYNC: "user:sync",
   },
 
   ERROR: {

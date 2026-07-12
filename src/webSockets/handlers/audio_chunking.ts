@@ -18,7 +18,7 @@ export function downloadAndChunkingHandler(socket: any) {
     async (data: DownloadStartedPayload) => {
       const sessionId = socket.data.sessionId;
       try {
-         if (!sessionId) {
+        if (!sessionId) {
           throw new Error(`Session ID not found for socket: ${socket.id}`);
         }
         const parsedData = downloadStartedPayloadSchema.safeParse(data);
@@ -28,7 +28,7 @@ export function downloadAndChunkingHandler(socket: any) {
 
         const { videoUrl, userId } = parsedData.data;
 
-       
+
         logger.info(`Download started for video: ${videoUrl}, user: ${userId}`);
 
         io.to(sessionId).emit(events.AUDIO.DOWNLOAD_STARTED, {
@@ -37,7 +37,7 @@ export function downloadAndChunkingHandler(socket: any) {
           videoUrl,
           userId,
         });
-        await audioChunker(videoUrl, env.CHUNK_SIZE, sessionId); // Assuming chunk size is from environment variables
+        await audioChunker(videoUrl, env.CHUNK_SIZE, sessionId);
 
         const files = (await readdir(`./cache/${sessionId}`))
           .filter((file) => file.endsWith(".wav"))

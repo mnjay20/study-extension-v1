@@ -15,6 +15,7 @@ import {
 import { downloadAndChunkingHandler } from "./handlers/audio_chunking.js";
 import { transcriptHandler } from "./handlers/transcription.js";
 import { searchQueryHandler } from "./handlers/search_query.js";
+import { UserSyncHandler } from "./handlers/users.js";
 
 export function registerSocketHandlers() {
     const io = getIO()
@@ -26,6 +27,19 @@ export function registerSocketHandlers() {
         const originalOn = socket.on;
         (socket as any).on = function (event: string, listener: (...args: any[]) => void) {
             return originalOn.call(this, event, async (...args: any[]) => {
+                // If a callback is expected by the handler but not passed, provide a dummy one to prevent server crashes
+                const expectedParamsCount = listener.length;
+                if (expectedParamsCount > 1) {
+                    const actualParamsCount = args.length;
+                    if (actualParamsCount < expectedParamsCount) {
+                        while (args.length < expectedParamsCount - 1) {
+                            args.push(undefined);
+                        }
+                        args.push(() => {});
+                    } else if (typeof args[expectedParamsCount - 1] !== 'function') {
+                        args[expectedParamsCount - 1] = () => {};
+                    }
+                }
                 try {
                     await listener(...args);
                 } catch (error) {
@@ -38,6 +52,9 @@ export function registerSocketHandlers() {
             });
         };
         
+        // user event handlers
+        UserSyncHandler(socket)
+
         // session event handlers
         SessionCreateHandler(socket)
         SessionJoinHandler(socket)

@@ -5,10 +5,12 @@ export function spawnYtdlp(url: string) {
     "yt-dlp",
     [
       "--format",
-      "bestaudio[acodec=opus]/bestaudio",
+      "bestaudio[acodec=opus]/bestaudio/best",
       "--no-playlist",
       "--quiet",
       "--no-warnings",
+      "--extractor-args",
+      "youtube:player-client=android",
       "--output",
       "-",
       url,

@@ -59,3 +59,19 @@ export async function getEmbeddingsCollection(): Promise<Collection> {
     }
     return EmbeddingsCollection!
 }
+
+let UserCollection: Promise<Collection> | null = null;
+
+export async function getUserCollection(): Promise<Collection> {
+    if (!UserCollection) {
+        UserCollection = (async () => {
+            const db = await getDb()
+            const col = db.collection("Users")
+            await col.createIndex({ userId: 1 }, { unique: true })
+            await col.createIndex({ email: 1 })
+            return col
+        })()
+        return UserCollection!
+    }
+    return UserCollection!
+}

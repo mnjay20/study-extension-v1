@@ -12,7 +12,7 @@ import {
   type SessionStatusType,
 } from "../../schmas/session_schema.js";
 import { Events } from "../../utils/events.js";
-import { getSessionCollection, getNotesCollection } from "../../database/collections.js";
+import { getSessionCollection, getNotesCollection, getUserCollection } from "../../database/collections.js";
 import { nanoid } from "nanoid";
 import { redis } from "../../configs/redis.js";
 import { logger } from "../../utils/logger.js";
@@ -73,7 +73,6 @@ export function SessionCreateHandler(socket: Socket) {
 
         const { userId, videoTitle, videoUrl, duration } = parsedPayload.data;
 
-        const sessionId = nanoid(16);
         const col = await getSessionCollection();
         if (!col) {
           callback({
@@ -82,6 +81,21 @@ export function SessionCreateHandler(socket: Socket) {
           });
           return;
         }
+
+        // Check if an active/existing session for the user and video URL already exists
+        const existingSession = await col.findOne({ userId, videoUrl });
+        if (existingSession) {
+          logger.info(`Found existing session: ${existingSession.sessionId} for user: ${userId} and video: ${videoTitle}`);
+          callback({
+            success: true,
+            sessionId: existingSession.sessionId,
+            isNew: false,
+            status: existingSession.status
+          } as any);
+          return;
+        }
+
+        const sessionId = nanoid(16);
         const session: SessionType = {
           sessionId: sessionId,
           userId,
@@ -103,6 +117,24 @@ export function SessionCreateHandler(socket: Socket) {
         }
 
         await col.insertOne(parsed.data); // creates the db object
+
+        // Sync user session mapping in Users collection
+        try {
+          const userCol = await getUserCollection();
+          await userCol.updateOne(
+            { userId },
+            { 
+              $addToSet: { sessions: sessionId },
+              $setOnInsert: { email: `${userId}@placeholder.com`, createdAt: new Date() },
+              $set: { updatedAt: new Date() }
+            },
+            { upsert: true }
+          );
+          logger.info(`Session ${sessionId} successfully linked to user "${userId}" in Users collection`);
+        } catch (userErr) {
+          logger.error(`Failed to link session ${sessionId} to user "${userId}" in Users collection:`, userErr);
+        }
+
         await redis.hset(`session:${sessionId}`, {
           status: "creating",
           progress: 0,
@@ -113,7 +145,9 @@ export function SessionCreateHandler(socket: Socket) {
         callback({
           success: true,
           sessionId,
-        });
+          isNew: true,
+          status: "creating"
+        } as any);
       } catch (error) {
         logger.error("Error in SessionCreateHandler:", error);
         callback({
@@ -204,7 +238,8 @@ export function SessionJoinHandler(socket: Socket) {
           success: true,
           message: `Joined session ${sessionId}`,
           notes: existingNotes,
-        });
+          status: currentStatus,
+        } as any);
       } catch (error) {
         logger.error("Error in SessionJoinHandler:", error);
         callback({

@@ -15,7 +15,8 @@ const inputSchema = z.object({
 async function extractFrameFromServer(videoUrl: string, timestampSeconds: number): Promise<string> {
     logger.info(`Getting direct stream URL via yt-dlp for video: ${videoUrl}`);
     const { stdout: streamUrl } = await execPromise(
-        `yt-dlp -f "bestvideo[height<=720]/best" -g "${videoUrl}"`
+        `yt-dlp -f "bestvideo[height<=720]/best" -g "${videoUrl}"`,
+        { timeout: 15000 }
     );
     
     const cleanStreamUrl = streamUrl.toString().trim();
@@ -26,7 +27,7 @@ async function extractFrameFromServer(videoUrl: string, timestampSeconds: number
     logger.info(`Extracting frame via ffmpeg at timestamp: ${timestampSeconds}s`);
     const { stdout: buffer } = await execPromise(
         `ffmpeg -ss ${timestampSeconds} -i "${cleanStreamUrl}" -vf "scale=854:-1" -q:v 5 -vframes 1 -f image2pipe -vcodec mjpeg -`,
-        { encoding: "buffer", maxBuffer: 10 * 1024 * 1024 }
+        { encoding: "buffer", maxBuffer: 10 * 1024 * 1024, timeout: 20000 }
     );
 
     return buffer.toString("base64");

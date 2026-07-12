@@ -12,7 +12,7 @@ const envSchema = z.object({
     EMBEDDING_MODEL: z.string().default("gemini-embedding-2"),
     REDIS_HOST: z.string().default("127.0.0.1"),
     REDIS_PORT: z.coerce.number().default(6379),
-    CHUNK_SIZE: z.coerce.number().int().min(1).default(30),
+    CHUNK_SIZE: z.coerce.number().int().min(1).default(60),
     VECTOR_INDEX: z.string().min(1, "Vector index is required"),
 
 
@@ -26,3 +26,4 @@ if (!parsed.success) {
 }
 
 export const env = Object.freeze(parsed.data)
+// Trigger backend hot reload to apply prompt boundary updates (v3)
