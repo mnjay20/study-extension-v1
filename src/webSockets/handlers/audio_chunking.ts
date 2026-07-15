@@ -9,6 +9,7 @@ import { Events } from "../../utils/events.js";
 import { getIO } from "../server.js";
 import { redis } from "../../configs/redis.js";
 import { logger } from "../../utils/logger.js";
+import { getSessionCollection } from "../../database/collections.js";
 
 export function downloadAndChunkingHandler(socket: any) {
   const io = getIO();
@@ -16,17 +17,31 @@ export function downloadAndChunkingHandler(socket: any) {
   socket.on(
     events.AUDIO.DOWNLOAD_STARTED,
     async (data: DownloadStartedPayload) => {
-      const sessionId = socket.data.sessionId;
+      let sessionId = socket.data.sessionId;
       try {
-        if (!sessionId) {
-          throw new Error(`Session ID not found for socket: ${socket.id}`);
-        }
         const parsedData = downloadStartedPayloadSchema.safeParse(data);
         if (!parsedData.success) {
           throw new Error(`Invalid data for download started event: ${parsedData.error.message}`);
         }
 
         const { videoUrl, userId } = parsedData.data;
+
+        if (!sessionId) {
+          const col = await getSessionCollection();
+          if (col) {
+            const sessionDb = await col.findOne({ userId, videoUrl });
+            if (sessionDb) {
+              sessionId = sessionDb.sessionId;
+              socket.data.sessionId = sessionId;
+              await socket.join(sessionId);
+              logger.info(`Recovered missing sessionId ${sessionId} for socket: ${socket.id}`);
+            }
+          }
+        }
+
+        if (!sessionId) {
+          throw new Error(`Session ID not found for socket: ${socket.id}`);
+        }
 
 
         logger.info(`Download started for video: ${videoUrl}, user: ${userId}`);

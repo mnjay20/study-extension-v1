@@ -179,38 +179,37 @@ export function SessionJoinHandler(socket: Socket) {
         }
         const { sessionId } = parsedPayload.data;
 
-        // Verify if session exists in Redis
-        let currentStatus = await redis.hget(`session:${sessionId}`, "status");
-        let currentProgress = await redis.hget(`session:${sessionId}`, "progress");
         const col = await getSessionCollection();
-
-        if (!currentStatus) {
-          // If not in Redis, check MongoDB
-          if (!col) {
-            callback({
-              success: false,
-              message: "Database connection failed",
-            });
-            return;
-          }
-          const sessionDb = await col.findOne({ sessionId });
-          if (!sessionDb) {
-            logger.warn("Join session request failed: session %s does not exist", sessionId);
-            callback({
-              success: false,
-              message: "Session does not exist",
-            });
-            return;
-          }
-          // Restore to Redis cache
-          await redis.hset(`session:${sessionId}`, {
-            status: sessionDb.status,
-            progress: sessionDb.progress,
+        if (!col) {
+          callback({
+            success: false,
+            message: "Database connection failed",
           });
-          await redis.expire(`session:${sessionId}`, 86400);
-          currentStatus = sessionDb.status;
-          currentProgress = String(sessionDb.progress);
+          return;
         }
+
+        // Verify if session exists in MongoDB to prevent stale Redis keys from bypassing verification
+        const sessionDb = await col.findOne({ sessionId });
+        if (!sessionDb) {
+          // Clean up stale Redis cache
+          await redis.del(`session:${sessionId}`);
+          logger.warn("Join session request failed: session %s does not exist in database", sessionId);
+          callback({
+            success: false,
+            message: "Session does not exist",
+          });
+          return;
+        }
+
+        // Ensure Redis is in sync with MongoDB session state
+        await redis.hset(`session:${sessionId}`, {
+          status: sessionDb.status,
+          progress: sessionDb.progress,
+        });
+        await redis.expire(`session:${sessionId}`, 86400);
+
+        let currentStatus = sessionDb.status;
+        let currentProgress = String(sessionDb.progress);
 
         await socket.join(sessionId);
         socket.data.sessionId = sessionId;

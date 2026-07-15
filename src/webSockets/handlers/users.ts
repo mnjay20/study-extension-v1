@@ -24,34 +24,22 @@ export function UserSyncHandler(socket: Socket) {
 
         const col = await getUserCollection();
         
-        // Find existing user
-        const existingUser = await col.findOne({ userId: payload.userId });
-        
-        if (existingUser) {
-          // Update email and timestamp
-          await col.updateOne(
-            { userId: payload.userId },
-            { 
-              $set: { 
-                email: payload.email,
-                updatedAt: new Date()
-              } 
+        // Race-condition free atomic upsert
+        await col.updateOne(
+          { userId: payload.userId },
+          { 
+            $set: { 
+              email: payload.email,
+              updatedAt: new Date()
+            },
+            $setOnInsert: {
+              sessions: [],
+              createdAt: new Date()
             }
-          );
-          logger.info(`User successfully updated: ${payload.userId} (email: ${payload.email})`);
-        } else {
-          // Insert new user document
-          const newUser = UserDocumentSchema.parse({
-            userId: payload.userId,
-            email: payload.email,
-            sessions: [],
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-          
-          await col.insertOne(newUser);
-          logger.info(`New user successfully registered: ${payload.userId} (email: ${payload.email})`);
-        }
+          },
+          { upsert: true }
+        );
+        logger.info(`User successfully synced: ${payload.userId} (email: ${payload.email})`);
 
         if (callback) {
           callback({ success: true, message: "User synced successfully" });

@@ -48,7 +48,10 @@ export async function getEmbeddingsCollection(): Promise<Collection> {
         EmbeddingsCollection = (async () => {
             const db = await getDb()
             const col = db.collection("Embeddings")
-            await col.createIndex({ sessionId: 1 }, { unique: true })
+            try {
+                await col.dropIndex("sessionId_1");
+            } catch (e) {}
+            await col.createIndex({ sessionId: 1, chunkId: 1 }, { unique: true })
             // await col.createIndex(
             //   { createdAt: 1 },
             //   { expireAfterSeconds: 60*60*24 }
