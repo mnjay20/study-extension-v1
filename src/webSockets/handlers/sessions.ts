@@ -123,7 +123,7 @@ export function SessionCreateHandler(socket: Socket) {
           const userCol = await getUserCollection();
           await userCol.updateOne(
             { userId },
-            { 
+            {
               $addToSet: { sessions: sessionId },
               $setOnInsert: { email: `${userId}@placeholder.com`, createdAt: new Date() },
               $set: { updatedAt: new Date() }
@@ -181,6 +181,7 @@ export function SessionJoinHandler(socket: Socket) {
 
         // Verify if session exists in Redis
         let currentStatus = await redis.hget(`session:${sessionId}`, "status");
+        let currentProgress = await redis.hget(`session:${sessionId}`, "progress");
         const col = await getSessionCollection();
 
         if (!currentStatus) {
@@ -208,6 +209,7 @@ export function SessionJoinHandler(socket: Socket) {
           });
           await redis.expire(`session:${sessionId}`, 86400);
           currentStatus = sessionDb.status;
+          currentProgress = String(sessionDb.progress);
         }
 
         await socket.join(sessionId);
@@ -233,12 +235,14 @@ export function SessionJoinHandler(socket: Socket) {
         const notesDoc = await notesCol.findOne({ sessionId });
         const existingNotes = notesDoc ? notesDoc.notes : [];
 
-        logger.info(`Socket ${socket.id} successfully joined session ${sessionId} (status: ${currentStatus}, existingNotesCount: ${existingNotes.length})`);
+        const progressNum = currentProgress ? parseInt(currentProgress, 10) : 0;
+        logger.info(`Socket ${socket.id} successfully joined session ${sessionId} (status: ${currentStatus}, progress: ${progressNum}, existingNotesCount: ${existingNotes.length})`);
         callback({
           success: true,
           message: `Joined session ${sessionId}`,
           notes: existingNotes,
           status: currentStatus,
+          progress: progressNum,
         } as any);
       } catch (error) {
         logger.error("Error in SessionJoinHandler:", error);

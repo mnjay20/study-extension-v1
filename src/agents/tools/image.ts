@@ -13,9 +13,10 @@ const inputSchema = z.object({
 })
 
 async function extractFrameFromServer(videoUrl: string, timestampSeconds: number): Promise<string> {
+    const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
     logger.info(`Getting direct stream URL via yt-dlp for video: ${videoUrl}`);
     const { stdout: streamUrl } = await execPromise(
-        `yt-dlp -f "bestvideo[height<=720]/best" -g "${videoUrl}"`,
+        `yt-dlp --user-agent "${userAgent}" --extractor-args "youtube:player-client=android" -f "bestvideo[height<=720]/best" -g "${videoUrl}"`,
         { timeout: 15000 }
     );
     
@@ -26,7 +27,7 @@ async function extractFrameFromServer(videoUrl: string, timestampSeconds: number
 
     logger.info(`Extracting frame via ffmpeg at timestamp: ${timestampSeconds}s`);
     const { stdout: buffer } = await execPromise(
-        `ffmpeg -ss ${timestampSeconds} -i "${cleanStreamUrl}" -vf "scale=854:-1" -q:v 5 -vframes 1 -f image2pipe -vcodec mjpeg -`,
+        `ffmpeg -y -ss ${timestampSeconds} -user_agent "${userAgent}" -i "${cleanStreamUrl}" -vf "scale=854:-1" -q:v 5 -vframes 1 -f image2pipe -vcodec mjpeg -`,
         { encoding: "buffer", maxBuffer: 10 * 1024 * 1024, timeout: 20000 }
     );
 

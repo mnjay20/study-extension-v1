@@ -4,6 +4,7 @@ import { Events } from "../utils/events.js";
 import { getIO } from "./server.js";
 import { SessionSchema } from "../schmas/session_schema.js";
 import { logger } from "../utils/logger.js";
+import { redis } from "../configs/redis.js";
 import {
   SessionCreateHandler,
   SessionJoinHandler,
@@ -62,6 +63,25 @@ export function registerSocketHandlers() {
         SessionUpdateProgressHandler(socket)
         SessionUpdateStatusHandler(socket)
         EndSessionHandler(socket)
+
+        // socket disconnect handler
+        socket.on('disconnect', async () => {
+            const sessionId = socket.data.sessionId;
+            if (sessionId) {
+                logger.info(`Socket ${socket.id} disconnected. Pausing session ${sessionId}`);
+                await redis.hset(`session:${sessionId}`, {
+                    status: "paused",
+                    lastActivity: new Date().toISOString(),
+                });
+                const col = await getSessionCollection();
+                if (col) {
+                    await col.updateOne(
+                        { sessionId: sessionId },
+                        { $set: { status: "paused" } }
+                    );
+                }
+            }
+        });
 
         //audio chunking event handlers
         downloadAndChunkingHandler(socket)
