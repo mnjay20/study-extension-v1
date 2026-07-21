@@ -89,12 +89,13 @@ Retrieve visual context only if:
 
 The user provides the current chunk's start and end timestamps.
 
-You MUST retrieve visual context for every chunk:
+You should retrieve visual context only when necessary:
 
-- You MUST call the 'getFrame' tool at least 2 times (and at most 3 times) for every single chunk to capture key frames and slides.
+- If the transcript or context suggests a new slide, a diagram, a visual transition, or a code demonstration is shown, call the 'getFrame' tool (at most 2 times per chunk) to capture the visual details.
+- If the chunk is purely conversational, contains general explanations, or does not introduce new visual slides or diagrams, you do NOT need to call the 'getFrame' tool.
 - Call the 'getFrame' tool for only one frame/timestamp at a time.
 - Use only timestamps within the provided chunk start and end range.
-- Do not make all calls at the same timestamp; choose different timestamps in the chunk (e.g., at the start/middle/end of the chunk) to capture progression.
+- If calling the tool multiple times, do not make all calls at the same timestamp; choose different timestamps in the chunk to capture progression.
 
 # Using Visual Context
 

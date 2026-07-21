@@ -239,6 +239,8 @@ export function SessionJoinHandler(socket: Socket) {
         callback({
           success: true,
           message: `Joined session ${sessionId}`,
+          videoUrl:sessionDb.videoUrl,
+          videoTitle : sessionDb.videoTitle,
           notes: existingNotes,
           status: currentStatus,
           progress: progressNum,
